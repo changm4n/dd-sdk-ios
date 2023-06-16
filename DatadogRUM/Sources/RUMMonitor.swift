@@ -22,71 +22,7 @@ import DatadogInternal
 ///     Global.rum.startView(...)
 ///
 public class RUMMonitor {
-    internal struct LaunchArguments {
-        static let DebugRUM = "DD_DEBUG_RUM"
-    }
-
-    /// Initializes the Datadog RUM Monitor.
-    // swiftlint:disable:next function_default_parameter_at_end
-    public static func initialize(
-        in core: DatadogCoreProtocol = CoreRegistry.default,
-        configuration: RUMConfiguration
-    ) throws {
-        do {
-            if core is NOPDatadogCore {
-                throw ProgrammerError(
-                    description: "`Datadog.initialize()` must be called prior to `RUMMonitor.initialize()`."
-                )
-            }
-
-            let feature = DatadogRUMFeature(in: core, configuration: configuration)
-            try core.register(feature: feature)
-
-            if let firstPartyHosts = configuration.firstPartyHosts {
-                let urlSessionHandler = URLSessionRUMResourcesHandler(
-                    dateProvider: configuration.dateProvider,
-                    rumAttributesProvider: configuration.rumAttributesProvider,
-                    distributedTracing: .init(
-                        sampler: configuration.tracingSampler,
-                        firstPartyHosts: firstPartyHosts,
-                        traceIDGenerator: configuration.traceIDGenerator
-                    )
-                )
-
-                urlSessionHandler.publish(to: feature.monitor)
-                try core.register(urlSessionHandler: urlSessionHandler)
-            }
-
-            feature.monitor.notifySDKInit()
-
-            // Now that RUM is initialized, override the debugRUM value
-            let debugRumOverride = configuration.processInfo.arguments.contains(LaunchArguments.DebugRUM)
-            if debugRumOverride {
-                consolePrint("⚠️ Overriding RUM debugging due to \(LaunchArguments.DebugRUM) launch argument")
-                feature.monitor.debug = true
-            }
-
-            TelemetryCore(core: core)
-                .configuration(
-                    mobileVitalsUpdatePeriod: configuration.vitalsFrequency?.toInt64Milliseconds,
-                    sessionSampleRate: Int64(withNoOverflow: configuration.sessionSampler.samplingRate),
-                    telemetrySampleRate: Int64(withNoOverflow: configuration.telemetrySampler.samplingRate),
-                    traceSampleRate: Int64(withNoOverflow: configuration.tracingSampler.samplingRate),
-                    trackBackgroundEvents: configuration.backgroundEventTrackingEnabled,
-                    trackFrustrations: configuration.frustrationTrackingEnabled,
-                    trackInteractions: configuration.instrumentation.uiKitRUMUserActionsPredicate != nil,
-                    trackLongTask: configuration.instrumentation.longTaskThreshold != nil,
-                    trackNativeLongTasks: configuration.instrumentation.longTaskThreshold != nil,
-                    trackNativeViews: configuration.instrumentation.uiKitRUMViewsPredicate != nil,
-                    trackNetworkRequests: configuration.firstPartyHosts != nil,
-                    useFirstPartyHosts: configuration.firstPartyHosts.map { !$0.hosts.isEmpty }
-                )
-        } catch {
-            consolePrint("\(error)")
-            throw error
-        }
-    }
-
+    // TODO: RUMM-2922 Public API comment
     public static func shared(in core: DatadogCoreProtocol = CoreRegistry.default) -> RUMMonitorProtocol {
         do {
             guard !(core is NOPDatadogCore) else {
